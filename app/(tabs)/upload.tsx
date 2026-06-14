@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { useSQLiteContext } from 'expo-sqlite';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Gradients, CollectionColors, Radius, Shadow } from '@/constants/theme';
 import { extractTermsFromImage, ExtractionResult } from '@/services/claude';
@@ -20,7 +19,6 @@ interface DraftTerm { id: string; word: string; definition: string; notes: strin
 type Phase = 'idle' | 'processing' | 'review';
 
 export default function Upload() {
-  const db = useSQLiteContext();
   const [phase, setPhase] = useState<Phase>('idle');
   const [terms, setTerms] = useState<DraftTerm[]>([]);
   const [copyright, setCopyright] = useState(false);
@@ -53,7 +51,7 @@ export default function Upload() {
       setTerms(result.terms.map(t => ({ ...t, id: randomUUID() })));
       setCopyright(result.copyrightWarning);
       setPhase('review');
-      const cols = await getCollections(db);
+      const cols = await getCollections();
       setCollections(cols);
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong.');
@@ -80,7 +78,7 @@ export default function Upload() {
     setTerms(parsed);
     setCopyright(false);
     setPhase('review');
-    setCollections(await getCollections(db));
+    setCollections(await getCollections());
   }
 
   async function save() {
@@ -89,10 +87,10 @@ export default function Upload() {
     setSaving(true);
     let colId = selectedColId;
     if (!colId) {
-      const col = await createCollection(db, colName, '', CollectionColors[Math.floor(Math.random() * CollectionColors.length)]);
+      const col = await createCollection(colName, '', CollectionColors[Math.floor(Math.random() * CollectionColors.length)]);
       colId = col.id;
     }
-    await createTerms(db, terms.map(t => ({ word: t.word, definition: t.definition, notes: t.notes })), colId);
+    await createTerms(terms.map(t => ({ word: t.word, definition: t.definition, notes: t.notes })), colId);
     setSaving(false);
     setPhase('idle');
     setTerms([]);

@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Radius, Shadow } from '@/constants/theme';
@@ -10,13 +9,12 @@ import { getAllTerms, getCollections } from '@/services/database';
 import StatCard from '@/components/StatCard';
 
 export default function Progress() {
-  const db = useSQLiteContext();
   const [terms, setTerms] = useState<Term[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [streak, setStreak] = useState(0);
 
   useFocusEffect(useCallback(() => {
-    Promise.all([getAllTerms(db), getCollections(db)]).then(([t, c]) => {
+    Promise.all([getAllTerms(), getCollections()]).then(([t, c]) => {
       setTerms(t);
       setCollections(c);
     });

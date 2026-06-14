@@ -4,7 +4,6 @@ import {
   TextInput, Alert, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -19,7 +18,6 @@ type Filter = 'all' | 'due' | 'learned' | 'new';
 
 export default function CollectionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const db = useSQLiteContext();
   const [collection, setCollection] = useState<Collection | null>(null);
   const [terms, setTerms] = useState<Term[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -32,7 +30,7 @@ export default function CollectionDetail() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function load() {
-    const [col, ts] = await Promise.all([getCollection(db, id), getTerms(db, id)]);
+    const [col, ts] = await Promise.all([getCollection(id), getTerms(id)]);
     setCollection(col);
     setTerms(ts);
   }
@@ -53,13 +51,13 @@ export default function CollectionDetail() {
   async function handleDelete(term: Term) {
     Alert.alert('Delete Term', `Delete "${term.word}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteTerm(db, term.id); load(); } },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteTerm(term.id); load(); } },
     ]);
   }
 
   async function handleAddTerm() {
     if (!newWord.trim() || !newDef.trim()) return;
-    await createTerms(db, [{ word: newWord.trim(), definition: newDef.trim(), notes: '' }], id);
+    await createTerms([{ word: newWord.trim(), definition: newDef.trim(), notes: '' }], id);
     setNewWord(''); setNewDef(''); setShowAdd(false); load();
   }
 
@@ -157,7 +155,7 @@ export default function CollectionDetail() {
         <EditModal
           term={editTerm}
           onSave={async (word, definition, notes) => {
-            await updateTerm(db, editTerm.id, { word, definition, notes });
+            await updateTerm(editTerm.id, { word, definition, notes });
             setEditTerm(null);
             load();
           }}

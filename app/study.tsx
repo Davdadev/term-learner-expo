@@ -4,7 +4,6 @@ import {
   Dimensions, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useLocalSearchParams, router } from 'expo-router';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
@@ -23,7 +22,6 @@ const SWIPE_THRESHOLD = 80;
 
 export default function Study() {
   const { ids } = useLocalSearchParams<{ ids: string }>();
-  const db = useSQLiteContext();
 
   const [terms, setTerms] = useState<Term[]>([]);
   const [index, setIndex] = useState(0);
@@ -40,7 +38,7 @@ export default function Study() {
   React.useEffect(() => {
     if (!ids) return;
     const idList = ids.split(',');
-    getAllTerms(db).then(all => {
+    getAllTerms().then(all => {
       const filtered = all.filter(t => idList.includes(t.id));
       setTerms(filtered);
       setLoaded(true);
@@ -51,7 +49,7 @@ export default function Study() {
 
   const onSwipeEnd = useCallback((isCorrect: boolean) => {
     if (!current) return;
-    recordReview(db, current, isCorrect).then(() => {
+    recordReview(current, isCorrect).then(() => {
       if (isCorrect) {
         setCorrect(c => c + 1);
         Vibration.vibrate(50);

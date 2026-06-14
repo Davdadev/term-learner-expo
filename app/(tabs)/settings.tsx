@@ -5,14 +5,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSQLiteContext } from 'expo-sqlite';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { getAPIKey, setAPIKey } from '@/services/claude';
 import { getPermissionStatus, requestPermissions, cancelAllReminders } from '@/services/notifications';
 import { getAllTerms, getCollections, deleteTerm, deleteCollection } from '@/services/database';
 
 export default function Settings() {
-  const db = useSQLiteContext();
   const [apiKey, setApiKeyState] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [reminders, setReminders] = useState(3);
@@ -29,8 +27,8 @@ export default function Settings() {
       getAPIKey(),
       AsyncStorage.getItem('remindersPerDay'),
       getPermissionStatus(),
-      getAllTerms(db),
-      getCollections(db),
+      getAllTerms(),
+      getCollections(),
     ]);
     setApiKeyState(key ?? '');
     setReminders(Number(rem) || 3);
@@ -61,9 +59,9 @@ export default function Settings() {
       {
         text: 'Reset', style: 'destructive',
         onPress: async () => {
-          const [terms, cols] = await Promise.all([getAllTerms(db), getCollections(db)]);
-          for (const t of terms) await deleteTerm(db, t.id);
-          for (const c of cols) await deleteCollection(db, c.id);
+          const [terms, cols] = await Promise.all([getAllTerms(), getCollections()]);
+          for (const t of terms) await deleteTerm(t.id);
+          for (const c of cols) await deleteCollection(c.id);
           await cancelAllReminders();
           await AsyncStorage.multiRemove(['currentStreak', 'lastStudyDate']);
           load();

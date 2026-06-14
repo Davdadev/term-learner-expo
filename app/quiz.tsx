@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors, Gradients, Radius, Shadow } from '@/constants/theme';
 import { Term } from '@/constants/types';
@@ -13,7 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Quiz() {
   const { termId, definition } = useLocalSearchParams<{ termId: string; definition: string }>();
-  const db = useSQLiteContext();
   const [term, setTerm] = useState<Term | null>(null);
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -21,7 +19,7 @@ export default function Quiz() {
 
   useEffect(() => {
     if (!termId) return;
-    getAllTerms(db).then(all => {
+    getAllTerms().then(all => {
       setTerm(all.find(t => t.id === termId) ?? null);
     });
   }, [termId]);
@@ -33,7 +31,7 @@ export default function Quiz() {
     const isCorrect = a === d || d.includes(a) || a.includes(d.slice(0, 8));
     setCorrect(isCorrect);
     setSubmitted(true);
-    await recordReview(db, term, isCorrect);
+    await recordReview(term, isCorrect);
     isCorrect ? Vibration.vibrate(50) : Vibration.vibrate([0, 50, 50, 50]);
   }
 

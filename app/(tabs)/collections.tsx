@@ -4,7 +4,6 @@ import {
   TouchableOpacity, TextInput, Modal, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import { Colors, CollectionColors, Radius, Shadow } from '@/constants/theme';
 import { Collection } from '@/constants/types';
@@ -12,7 +11,6 @@ import { getCollections, createCollection, deleteCollection } from '@/services/d
 import CollectionCard from '@/components/CollectionCard';
 
 export default function Collections() {
-  const db = useSQLiteContext();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -22,12 +20,12 @@ export default function Collections() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function load() {
-    setCollections(await getCollections(db));
+    setCollections(await getCollections());
   }
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    await createCollection(db, newName.trim(), '', selectedColor);
+    await createCollection(newName.trim(), '', selectedColor);
     setNewName('');
     setShowAdd(false);
     load();
@@ -38,7 +36,7 @@ export default function Collections() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
-        onPress: async () => { await deleteCollection(db, col.id); load(); },
+        onPress: async () => { await deleteCollection(col.id); load(); },
       },
     ]);
   }

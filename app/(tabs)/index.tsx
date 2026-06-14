@@ -4,7 +4,6 @@ import {
   TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Gradients, Radius, Shadow } from '@/constants/theme';
@@ -16,7 +15,6 @@ import StatCard from '@/components/StatCard';
 import CollectionCard from '@/components/CollectionCard';
 
 export default function Home() {
-  const db = useSQLiteContext();
   const [terms, setTerms] = useState<Term[]>([]);
   const [due, setDue] = useState<Term[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -28,7 +26,7 @@ export default function Home() {
 
   async function load() {
     const [all, dueTerms, cols] = await Promise.all([
-      getAllTerms(db), getDueTerms(db), getCollections(db),
+      getAllTerms(), getDueTerms(), getCollections(),
     ]);
     setTerms(all);
     setDue(dueTerms);
