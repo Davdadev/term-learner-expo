@@ -1,65 +1,56 @@
-import * as SQLite from 'expo-sqlite/legacy';
+import * as SQLite from 'expo-sqlite';
 import { Term, Collection, scheduleReview } from '@/constants/types';
 
-const db = SQLite.openDatabase('termlearner.db');
+let _db: SQLite.SQLiteDatabase | null = null;
 let _ready: Promise<void> | null = null;
+
+async function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!_db) {
+    _db = await SQLite.openDatabaseAsync('termlearner.db');
+  }
+  return _db;
+}
 
 export function initDatabase(): Promise<void> {
   if (_ready) return _ready;
-  _ready = new Promise<void>((resolve, reject) => {
-    db.transaction(
-      tx => {
-        tx.executeSql('PRAGMA journal_mode = WAL');
-        tx.executeSql('PRAGMA foreign_keys = ON');
-        tx.executeSql(`
-          CREATE TABLE IF NOT EXISTS collections (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            color_hex   TEXT DEFAULT '6C63FF',
-            created_at  TEXT NOT NULL
-          )
-        `);
-        tx.executeSql(`
-          CREATE TABLE IF NOT EXISTS terms (
-            id               TEXT PRIMARY KEY,
-            word             TEXT NOT NULL,
-            definition       TEXT NOT NULL,
-            notes            TEXT DEFAULT '',
-            mastery_level    INTEGER DEFAULT 0,
-            next_review_date TEXT NOT NULL,
-            times_correct    INTEGER DEFAULT 0,
-            times_incorrect  INTEGER DEFAULT 0,
-            created_at       TEXT NOT NULL,
-            collection_id    TEXT NOT NULL,
-            FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
-          )
-        `);
-      },
-      reject,
-      resolve
-    );
-  });
-  return _ready;
-}
+  _ready = (async () => {
+    const db = await getDb();
+    await db.execAsync(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
 
-function exec(
-  sql: string,
-  args: (string | number | null)[] = []
-): Promise<SQLite.SQLResultSet> {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      tx => tx.executeSql(sql, args, (_, res) => resolve(res), (_, err) => { reject(err); return false; }),
-      reject
-    );
-  });
+      CREATE TABLE IF NOT EXISTS collections (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        color_hex   TEXT DEFAULT '6C63FF',
+        created_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS terms (
+        id               TEXT PRIMARY KEY,
+        word             TEXT NOT NULL,
+        definition       TEXT NOT NULL,
+        notes            TEXT DEFAULT '',
+        mastery_level    INTEGER DEFAULT 0,
+        next_review_date TEXT NOT NULL,
+        times_correct    INTEGER DEFAULT 0,
+        times_incorrect  INTEGER DEFAULT 0,
+        created_at       TEXT NOT NULL,
+        collection_id    TEXT NOT NULL,
+        FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+      );
+    `);
+  })();
+  return _ready;
 }
 
 // ── Collections ────────────────────────────────────────────────────────────────
 
 export async function getCollections(): Promise<Collection[]> {
   await initDatabase();
-  const res = await exec(`
+  const db = await getDb();
+  const rows = await db.getAllAsync<any>(`
     SELECT
       c.*,
       COUNT(t.id)                                      AS term_count,
@@ -70,12 +61,13 @@ export async function getCollections(): Promise<Collection[]> {
     GROUP BY c.id
     ORDER BY c.created_at DESC
   `);
-  return Array.from({ length: res.rows.length }, (_, i) => rowToCollection(res.rows.item(i)));
+  return rows.map(rowToCollection);
 }
 
 export async function getCollection(id: string): Promise<Collection | null> {
   await initDatabase();
-  const res = await exec(
+  const db = await getDb();
+  const row = await db.getFirstAsync<any>(
     `SELECT c.*,
       COUNT(t.id) AS term_count,
       SUM(CASE WHEN t.mastery_level >= 4 THEN 1 END) AS learned_count,
@@ -84,16 +76,17 @@ export async function getCollection(id: string): Promise<Collection | null> {
      WHERE c.id = ? GROUP BY c.id`,
     [id]
   );
-  return res.rows.length > 0 ? rowToCollection(res.rows.item(0)) : null;
+  return row ? rowToCollection(row) : null;
 }
 
 export async function createCollection(
   name: string, description = '', colorHex = '6C63FF'
 ): Promise<Collection> {
   await initDatabase();
+  const db = await getDb();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  await exec(
+  await db.runAsync(
     'INSERT INTO collections (id, name, description, color_hex, created_at) VALUES (?, ?, ?, ?, ?)',
     [id, name, description, colorHex, now]
   );
@@ -102,31 +95,35 @@ export async function createCollection(
 
 export async function deleteCollection(id: string) {
   await initDatabase();
-  await exec('DELETE FROM collections WHERE id = ?', [id]);
+  const db = await getDb();
+  await db.runAsync('DELETE FROM collections WHERE id = ?', [id]);
 }
 
 // ── Terms ──────────────────────────────────────────────────────────────────────
 
 export async function getTerms(collectionId: string): Promise<Term[]> {
   await initDatabase();
-  const res = await exec(
+  const db = await getDb();
+  const rows = await db.getAllAsync<any>(
     'SELECT * FROM terms WHERE collection_id = ? ORDER BY word ASC', [collectionId]
   );
-  return Array.from({ length: res.rows.length }, (_, i) => rowToTerm(res.rows.item(i)));
+  return rows.map(rowToTerm);
 }
 
 export async function getAllTerms(): Promise<Term[]> {
   await initDatabase();
-  const res = await exec('SELECT * FROM terms ORDER BY word ASC');
-  return Array.from({ length: res.rows.length }, (_, i) => rowToTerm(res.rows.item(i)));
+  const db = await getDb();
+  const rows = await db.getAllAsync<any>('SELECT * FROM terms ORDER BY word ASC');
+  return rows.map(rowToTerm);
 }
 
 export async function getDueTerms(): Promise<Term[]> {
   await initDatabase();
-  const res = await exec(
+  const db = await getDb();
+  const rows = await db.getAllAsync<any>(
     "SELECT * FROM terms WHERE next_review_date <= datetime('now') ORDER BY next_review_date ASC"
   );
-  return Array.from({ length: res.rows.length }, (_, i) => rowToTerm(res.rows.item(i)));
+  return rows.map(rowToTerm);
 }
 
 export async function createTerms(
@@ -134,37 +131,34 @@ export async function createTerms(
   collectionId: string
 ) {
   await initDatabase();
+  const db = await getDb();
   const now = new Date().toISOString();
-  await new Promise<void>((resolve, reject) => {
-    db.transaction(
-      tx => {
-        for (const t of terms) {
-          tx.executeSql(
-            `INSERT INTO terms (id, word, definition, notes, mastery_level, next_review_date, times_correct, times_incorrect, created_at, collection_id)
-             VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?, ?)`,
-            [crypto.randomUUID(), t.word, t.definition, t.notes, now, now, collectionId]
-          );
-        }
-      },
-      reject,
-      resolve
-    );
+  await db.withTransactionAsync(async () => {
+    for (const t of terms) {
+      await db.runAsync(
+        `INSERT INTO terms (id, word, definition, notes, mastery_level, next_review_date, times_correct, times_incorrect, created_at, collection_id)
+         VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?, ?)`,
+        [crypto.randomUUID(), t.word, t.definition, t.notes, now, now, collectionId]
+      );
+    }
   });
 }
 
 export async function updateTerm(id: string, updates: Partial<Term>) {
   await initDatabase();
+  const db = await getDb();
   const fields = Object.entries(updates)
     .map(([k]) => `${camelToSnake(k)} = ?`)
     .join(', ');
   const values = [...Object.values(updates), id];
-  await exec(`UPDATE terms SET ${fields} WHERE id = ?`, values as any);
+  await db.runAsync(`UPDATE terms SET ${fields} WHERE id = ?`, values as any);
 }
 
 export async function recordReview(term: Term, correct: boolean) {
   await initDatabase();
+  const db = await getDb();
   const { newLevel, nextDate } = scheduleReview(term.masteryLevel, correct);
-  await exec(
+  await db.runAsync(
     `UPDATE terms SET
        mastery_level    = ?,
        next_review_date = ?,
@@ -177,7 +171,8 @@ export async function recordReview(term: Term, correct: boolean) {
 
 export async function deleteTerm(id: string) {
   await initDatabase();
-  await exec('DELETE FROM terms WHERE id = ?', [id]);
+  const db = await getDb();
+  await db.runAsync('DELETE FROM terms WHERE id = ?', [id]);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
