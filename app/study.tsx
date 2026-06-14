@@ -6,14 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring,
-  runOnJS, useAnimatedGestureHandler,
+  useSharedValue, useAnimatedStyle, withSpring, runOnJS,
 } from 'react-native-reanimated';
-import { PanGestureHandler } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Gradients, Radius, Shadow } from '@/constants/theme';
-import { Term, masteryLabel } from '@/constants/types';
+import { Term } from '@/constants/types';
 import { getAllTerms, recordReview } from '@/services/database';
 import MasteryBadge from '@/components/MasteryBadge';
 
@@ -33,8 +32,8 @@ export default function Study() {
 
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
+  const revealedRef = useSharedValue(false);
 
-  // Load terms on mount
   React.useEffect(() => {
     if (!ids) return;
     const idList = ids.split(',');
@@ -59,6 +58,7 @@ export default function Study() {
       }
       translateX.value = 0;
       rotate.value = 0;
+      revealedRef.value = false;
       setReveal(false);
       if (index + 1 >= terms.length) {
         updateStreak();
@@ -69,14 +69,14 @@ export default function Study() {
     });
   }, [current, index, terms.length]);
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onActive: (e) => {
-      if (!revealed) return;
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      if (!revealedRef.value) return;
       translateX.value = e.translationX;
       rotate.value = e.translationX / 20;
-    },
-    onEnd: (e) => {
-      if (!revealed) return;
+    })
+    .onEnd((e) => {
+      if (!revealedRef.value) return;
       if (e.translationX > SWIPE_THRESHOLD) {
         translateX.value = withSpring(width * 1.5);
         runOnJS(onSwipeEnd)(true);
@@ -87,8 +87,7 @@ export default function Study() {
         translateX.value = withSpring(0);
         rotate.value = withSpring(0);
       }
-    },
-  });
+    });
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
@@ -96,6 +95,11 @@ export default function Study() {
       { rotate: `${rotate.value}deg` },
     ],
   }));
+
+  function reveal() {
+    revealedRef.value = true;
+    setReveal(true);
+  }
 
   async function updateStreak() {
     const last = await AsyncStorage.getItem('lastStudyDate');
@@ -149,7 +153,6 @@ export default function Study() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.closeBtn}>✕</Text>
@@ -166,13 +169,11 @@ export default function Study() {
         </View>
       </View>
 
-      {/* Card */}
       <View style={styles.cardArea}>
-        {/* Ghost cards for depth */}
         <View style={[styles.card, styles.cardGhost2]} />
         <View style={[styles.card, styles.cardGhost1]} />
 
-        <PanGestureHandler onGestureEvent={gestureHandler}>
+        <GestureDetector gesture={pan}>
           <Animated.View style={[styles.card, cardStyle]}>
             <MasteryBadge level={current.masteryLevel} />
             <View style={styles.cardContent}>
@@ -188,12 +189,11 @@ export default function Study() {
               )}
             </View>
           </Animated.View>
-        </PanGestureHandler>
+        </GestureDetector>
 
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => { if (!revealed) setReveal(true); }} />
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => { if (!revealed) reveal(); }} />
       </View>
 
-      {/* Action buttons */}
       <View style={styles.actions}>
         {revealed ? (
           <View style={styles.answerBtns}>

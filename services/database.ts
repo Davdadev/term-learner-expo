@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite/legacy';
 import { Term, Collection, scheduleReview } from '@/constants/types';
-import { randomUUID } from 'expo-crypto';
 
 const db = SQLite.openDatabase('termlearner.db');
 let _ready: Promise<void> | null = null;
@@ -92,7 +91,7 @@ export async function createCollection(
   name: string, description = '', colorHex = '6C63FF'
 ): Promise<Collection> {
   await initDatabase();
-  const id = randomUUID();
+  const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await exec(
     'INSERT INTO collections (id, name, description, color_hex, created_at) VALUES (?, ?, ?, ?, ?)',
@@ -143,7 +142,7 @@ export async function createTerms(
           tx.executeSql(
             `INSERT INTO terms (id, word, definition, notes, mastery_level, next_review_date, times_correct, times_incorrect, created_at, collection_id)
              VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?, ?)`,
-            [randomUUID(), t.word, t.definition, t.notes, now, now, collectionId]
+            [crypto.randomUUID(), t.word, t.definition, t.notes, now, now, collectionId]
           );
         }
       },
